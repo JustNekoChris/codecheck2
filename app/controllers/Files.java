@@ -63,26 +63,38 @@ public class Files extends Controller {
         }
         if (problemFiles.containsKey(Path.of("tracer.js")))
         	return tracer2(ccid, problemFiles);
-        
+        String result = resultMaker(problemFiles, request, repo, problemName);
+        wakeupChecker();
+        Http.Cookie newCookie = models.Util.buildCookie("ccid", ccid);
+        return ok(result).withCookies(newCookie).as("text/html");
+    }
+
+    private String resultMaker(Map<Path, byte[]> problemFiles, Http.Request request, String repo, String problemName) 
+            throws IOException, NoSuchMethodException, ScriptException{
+
         Problem problem = new Problem(problemFiles);
         ObjectNode data = models.Util.toJson(problem.getProblemData());
+
         data.put("url",  models.Util.prefix(request) + "/checkNJS");
         data.put("repo", repo);
         data.put("problem", problemName);
+
         String description = "";
+
         if (data.has("description")) {
             description = data.get("description").asText();
             data.remove("description");
         }
+
         StringBuilder result = new StringBuilder();
+        
         result.append(start2);
         result.append(description);
         result.append(mid2);
-            result.append(data.toString());
+        result.append(data.toString());
         result.append(end2);
-        wakeupChecker();
-        Http.Cookie newCookie = models.Util.buildCookie("ccid", ccid);
-        return ok(result.toString()).withCookies(newCookie).as("text/html");
+
+        return result.toString();
     }
 
     private void wakeupChecker() {
