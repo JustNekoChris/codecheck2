@@ -17,85 +17,34 @@ import com.horstmann.codecheck.Util;
 import com.typesafe.config.Config;
 
 import models.CodeCheck;
-import play.Logger;
+// import play.Logger;
 import play.mvc.Controller;
 import play.mvc.Http;
 import play.mvc.Result;
 
+// New Classes Added
+import java.lang.System.Logger;
+
 public class Files extends Controller {
     @Inject private CodeCheck codeCheck;    
-    private static Logger.ALogger logger = Logger.of("com.horstmann.codecheck");
+    private static Logger logger = System.getLogger("com.horstmann.codecheck");
     @Inject private Config config;          
+    @Inject private FilesService filesService;
+
     
-    String start2 = "<!DOCTYPE html>\n<html><head>\n"
-            + "<title>CodeCheck</title>"
-            + "<meta http-equiv='content-type' content='text/html; charset=UTF-8' />\n"
-            + "<script src='/assets/download.js'></script>\n" 
-            + "<script src='/assets/ace/ace.js'></script>\n"
-            + "<script src='/assets/ace/theme-kuroir.js'></script>\n"
-            + "<script src='/assets/ace/theme-chrome.js'></script>\n"
-            + "<script src='/assets/util.js'></script>\n"
-            + "<script src='/assets/codecheck2.js'></script>\n"
-            + "<script src='/assets/horstmann_codecheck.js'></script>\n"
-            + "<link type='text/css' rel='stylesheet' href='/assets/codecheck.css'/>\n" 
-            + "<link type='text/css' rel='stylesheet' href='/assets/horstmann_codecheck.css'/>\n" 
-            + "</head><body>\n";
-    String mid2 = "<div class='horstmann_codecheck'><script type='text/javascript'>//<![CDATA[\n" 
-            + "horstmann_codecheck.setup.push(";
-    String end2 = ")\n"  
-            + "// ]]>\n"  
-            + "</script></div>\n"  
-            + "</body>\n" 
-            + "</html>";
-    
-    public Result filesHTML2(Http.Request request, String repo, String problemName, String ccid)
+public Result filesHTML2(Http.Request request, String repo, String problemName, String ccid)
             throws IOException, NoSuchMethodException, ScriptException {
         if (ccid == null) {
             Optional<Http.Cookie> ccidCookie = request.getCookie("ccid");
             ccid = ccidCookie.map(Http.Cookie::value).orElse(Util.createPronouncableUID());
         }
-        Map<Path, byte[]> problemFiles;
-        try {
-            problemFiles = codeCheck.loadProblem(repo, problemName, ccid);
-        } catch (Exception e) {
-            logger.error("filesHTML2: Cannot load problem " + repo + "/" + " " + problemName, e);
-            return badRequest("Cannot load problem " + repo + "/" + problemName);
-        }
-        if (problemFiles.containsKey(Path.of("tracer.js")))
-        	return tracer2(ccid, problemFiles);
-        String result = resultMaker(problemFiles, request, repo, problemName);
+        String result = filesService.resultMaker(models.Util.prefix(request), repo, problemName, ccid);
+        if (result.equals("0")) return badRequest("Cannot load problem " + repo + "/" + problemName);
         wakeupChecker();
         Http.Cookie newCookie = models.Util.buildCookie("ccid", ccid);
         return ok(result).withCookies(newCookie).as("text/html");
     }
 
-    private String resultMaker(Map<Path, byte[]> problemFiles, Http.Request request, String repo, String problemName) 
-            throws IOException, NoSuchMethodException, ScriptException{
-
-        Problem problem = new Problem(problemFiles);
-        ObjectNode data = models.Util.toJson(problem.getProblemData());
-
-        data.put("url",  models.Util.prefix(request) + "/checkNJS");
-        data.put("repo", repo);
-        data.put("problem", problemName);
-
-        String description = "";
-
-        if (data.has("description")) {
-            description = data.get("description").asText();
-            data.remove("description");
-        }
-
-        StringBuilder result = new StringBuilder();
-        
-        result.append(start2);
-        result.append(description);
-        result.append(mid2);
-        result.append(data.toString());
-        result.append(end2);
-
-        return result.toString();
-    }
 
     private void wakeupChecker() {
         // Wake up the checker
@@ -111,23 +60,6 @@ public class Files extends Controller {
         } }).start();
     }
 
-    private static String tracerStart = "<!DOCTYPE html>\n"
-            + "<html>\n"
-            + "<head>\n"
-            + "  <meta charset=\"utf-8\">\n"
-            + "  <link href='https://horstmann.com/codecheck/css/codecheck_tracer.css' rel='stylesheet' type='text/css'/>  "
-            + "  <title>CodeCheck Tracer</title>\n"
-            + "  <script src='/assets/util.js'></script>\n"
-            + "  <script src='/assets/codecheck2.js'></script>\n"
-            + "</head>\n"
-            + "<body>\n";
-    private static String tracerScriptStart = "    <div class='codecheck_tracer'>\n"
-            + "      <script type='module'>//<![CDATA[\n";
-    private static String tracerEnd = "// ]]>\n"
-            + "      </script>\n"
-            + "  </div>\n"
-            + "</body>\n"
-            + "</html>";
     
     public Result tracer(Http.Request request, String repo, String problemName, String ccid)
             throws IOException {
@@ -135,30 +67,12 @@ public class Files extends Controller {
             Optional<Http.Cookie> ccidCookie = request.getCookie("ccid");
             ccid = ccidCookie.map(Http.Cookie::value).orElse(Util.createPronouncableUID());
         }
-        Map<Path, byte[]> problemFiles;
-        try {
-            problemFiles = codeCheck.loadProblem(repo, problemName, ccid);
-        } catch (Exception e) {
-            logger.error("filesHTML: Cannot load problem " + repo + "/" + problemName, e);
-            return badRequest("Cannot load problem " + repo + "/" + problemName);
-        }
-        return tracer2(ccid, problemFiles);
+        String result = filesService.tracer2(ccid, filesService.getProblemFiles(problemName, repo, ccid));
+        if (result.equals("0")) return badRequest("Cannot load problem " + repo + "/" + problemName);
+        Http.Cookie newCookie = models.Util.buildCookie("ccid", ccid);
+        return ok(result).withCookies(newCookie).as("text/html");
     }
 
-	private Result tracer2(String ccid, Map<Path, byte[]> problemFiles) throws IOException {
-		Problem problem = new Problem(problemFiles);
-        Problem.DisplayData data = problem.getProblemData();
-        StringBuilder result = new StringBuilder();
-        result.append(tracerStart);
-        if (data.description != null)
-            result.append(data.description);
-        result.append(tracerScriptStart);
-        result.append(Util.getString(problemFiles, Path.of("tracer.js")));
-        result.append(tracerEnd);
-
-        Http.Cookie newCookie = models.Util.buildCookie("ccid", ccid);
-        return ok(result.toString()).withCookies(newCookie).as("text/html");
-	}
         
     // TODO: Caution--this won't do the right thing with param.js randomness when
     // used to prebuild UI like in ebook, Udacity
@@ -172,7 +86,7 @@ public class Files extends Controller {
         try {
             problemFiles = codeCheck.loadProblem(repo, problemName, ccid);
         } catch (Exception e) {
-            logger.error("fileData: Cannot load problem " + repo + "/" + problemName, e);
+            logger.log(Logger.Level.ERROR, "fileData: Cannot load problem " + repo + "/" + problemName, e);
             return badRequest("Cannot load problem " + repo + "/" + problemName);
         }       
         
@@ -217,7 +131,7 @@ public class Files extends Controller {
         try {
             problemFiles = codeCheck.loadProblem(repo, problemName, ccid);
         } catch (Exception e) {
-            logger.error("filesHTML: Cannot load problem " + repo + "/" + problemName, e);
+            logger.log(Logger.Level.ERROR, "filesHTML: Cannot load problem " + repo + "/" + problemName, e);
             return badRequest("Cannot load problem " + repo + "/" + problemName);
         }
         Problem problem = new Problem(problemFiles);
