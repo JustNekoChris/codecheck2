@@ -19,7 +19,6 @@ import play.mvc.Result;
 
 public class FilesService {
     @Inject private CodeCheck codeCheck;    
-    @Inject private Files files;
     private static Logger logger = System.getLogger("com.horstmann.codecheck");
     
     String start2 = "<!DOCTYPE html>\n<html><head>\n"
