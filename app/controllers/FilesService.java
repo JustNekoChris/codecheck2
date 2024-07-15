@@ -2,24 +2,25 @@ package controllers;
 
 import java.io.IOException;
 import java.lang.System.Logger;
+import java.net.URL;
 import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
 
 import javax.script.ScriptException;
+import javax.inject.Inject;
 
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import com.google.inject.Inject;
 import com.horstmann.codecheck.Problem;
 import com.horstmann.codecheck.Util;
+import com.typesafe.config.Config;
 
 import models.CodeCheck;
-import play.mvc.Http;
-import play.mvc.Result;
 
 public class FilesService {
     @Inject private CodeCheck codeCheck;    
     private static Logger logger = System.getLogger("com.horstmann.codecheck");
+    @Inject private Config config;          
     
     String start2 = "<!DOCTYPE html>\n<html><head>\n"
             + "<title>CodeCheck</title>"
@@ -115,5 +116,20 @@ public class FilesService {
             return new HashMap<>(); // returns empty map if exception
         }
         return problemFiles;
+    }
+    
+
+    public void wakeupChecker() {
+        // Wake up the checker
+        String path = "com.horstmann.codecheck.comrun.remote"; 
+        if (!config.hasPath(path)) return;
+        String remoteURL = config.getString(path);
+        if (remoteURL.isBlank()) return;
+        new Thread(() -> { try {                        
+            URL checkerWakeupURL = new URL(remoteURL + "/api/health");
+            checkerWakeupURL.openStream().readAllBytes();
+        } catch (IOException e) {
+            e.printStackTrace();
+        } }).start();
     }
 }

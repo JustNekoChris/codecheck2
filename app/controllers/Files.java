@@ -40,25 +40,11 @@ public Result filesHTML2(Http.Request request, String repo, String problemName, 
         }
         String result = filesService.resultMaker(models.Util.prefix(request), repo, problemName, ccid);
         if (result.equals("0")) return badRequest("Cannot load problem " + repo + "/" + problemName);
-        wakeupChecker();
+        filesService.wakeupChecker();
         Http.Cookie newCookie = models.Util.buildCookie("ccid", ccid);
         return ok(result).withCookies(newCookie).as("text/html");
     }
 
-
-    private void wakeupChecker() {
-        // Wake up the checker
-        String path = "com.horstmann.codecheck.comrun.remote"; 
-        if (!config.hasPath(path)) return;
-        String remoteURL = config.getString(path);
-        if (remoteURL.isBlank()) return;
-        new Thread(() -> { try {                        
-            URL checkerWakeupURL = new URL(remoteURL + "/api/health");
-            checkerWakeupURL.openStream().readAllBytes();
-        } catch (IOException e) {
-            e.printStackTrace();
-        } }).start();
-    }
 
     
     public Result tracer(Http.Request request, String repo, String problemName, String ccid)
@@ -82,13 +68,9 @@ public Result filesHTML2(Http.Request request, String repo, String problemName, 
             Optional<Http.Cookie> ccidCookie = request.getCookie("ccid");
             ccid = ccidCookie.map(Http.Cookie::value).orElse(Util.createPronouncableUID());
         }
-        Map<Path, byte[]> problemFiles;
-        try {
-            problemFiles = codeCheck.loadProblem(repo, problemName, ccid);
-        } catch (Exception e) {
-            logger.log(Logger.Level.ERROR, "fileData: Cannot load problem " + repo + "/" + problemName, e);
-            return badRequest("Cannot load problem " + repo + "/" + problemName);
-        }       
+        Map<Path, byte[]> problemFiles = filesService.getProblemFiles(problemName, repo, ccid);
+        if (problemFiles.isEmpty())
+            return badRequest("Cannot load problem " + repo + "/" + problemName);      
         
         Problem problem = new Problem(problemFiles);
         Http.Cookie newCookie = models.Util.buildCookie("ccid", ccid);
