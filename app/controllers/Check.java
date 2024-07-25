@@ -33,41 +33,18 @@ import play.mvc.Result;
 public class Check extends Controller {
     private CodecheckExecutionContext ccec; 
     @Inject private CodeCheck codeCheck;
+    @Inject private CheckService checkService;
     
     // TODO: Legacy HTML report, used in Core Java for the Impatient 2e, 3e
     public CompletableFuture<Result> checkHTML(Http.Request request) throws IOException, InterruptedException {
         Map<String, String[]> params = request.body().asFormUrlEncoded();
         return CompletableFuture.supplyAsync(() -> {
             try {
-                String ccid = null;
-                String repo = "ext";
-                String problem = "";
-                Map<Path, String> submissionFiles = new TreeMap<>();
-                
-                for (String key : params.keySet()) {
-                    String value = params.get(key)[0];
-                    if (key.equals("repo"))
-                        repo = value;
-                    else if (key.equals("problem"))
-                        problem = value;
-                    else if (key.equals("ccid")) // TODO: For testing of randomization?
-                        ccid = value;
-                    else
-                        submissionFiles.put(Paths.get(key), value);
-                }
-                if (ccid == null) { 
-                    Optional<Http.Cookie> ccidCookie = request.getCookie("ccid");
-                    ccid = ccidCookie.map(Http.Cookie::value).orElse(com.horstmann.codecheck.Util.createPronouncableUID());
-                }
-                long startTime = System.nanoTime();         
-                String report = codeCheck.run("html", repo, problem, ccid, submissionFiles);
-                double elapsed = (System.nanoTime() - startTime) / 1000000000.0;
-                if (report == null || report.length() == 0) {
-                    report = String.format("Timed out after %5.0f seconds\n", elapsed);
-                }
-                
-                Http.Cookie newCookie = models.Util.buildCookie("ccid", ccid);
-                return ok(report).withCookies(newCookie).as("text/html");
+                Optional<Http.Cookie> ccidCookie = request.getCookie("ccid");
+                String ccid = ccidCookie.map(Http.Cookie::value).orElse(com.horstmann.codecheck.Util.createPronouncableUID());
+                String[] result = checkService.checkHTMLreport(ccid, params);
+                Http.Cookie newCookie = models.Util.buildCookie("ccid", result[0]);
+                return ok(result[1]).withCookies(newCookie).as("text/html");
             }
             catch (Exception ex) {
                 return internalServerError(Util.getStackTrace(ex));
@@ -83,18 +60,8 @@ public class Check extends Controller {
 	            Map<Path, String> submissionFiles = new TreeMap<>();
 	            String contentType = request.contentType().orElse("");
 		        if ("application/x-www-form-urlencoded".equals(contentType)) {
-		            params = request.body().asFormUrlEncoded();
-	                for (String key : params.keySet()) {
-	                    String value = params.get(key)[0];
-                        submissionFiles.put(Paths.get(key), value);
-	                }
-	                long startTime = System.nanoTime();         
-	                String report = codeCheck.run("Text", submissionFiles);
-	                double elapsed = (System.nanoTime() - startTime) / 1000000000.0;
-	                if (report == null || report.length() == 0) {
-	                    report = String.format("Timed out after %5.0f seconds\n", elapsed);
-	                }
-	                return ok(report).as("text/plain");
+                        params = request.body().asFormUrlEncoded();
+                        return ok(checkService.run_x_www_form_urlencoded(params)).as("text/plain");
 		        } else if ("multipart/form-data".equals(contentType)) {
 		            play.mvc.Http.MultipartFormData<TemporaryFile> body = request.body().asMultipartFormData();
 		            

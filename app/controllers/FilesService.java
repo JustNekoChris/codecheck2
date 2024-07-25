@@ -15,13 +15,12 @@ import javax.inject.Inject;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.horstmann.codecheck.Problem;
 import com.horstmann.codecheck.Util;
-import com.typesafe.config.Config;
 
 import models.CodeCheck;
 
 public class FilesService {
     @Inject private CodeCheck codeCheck;    
-    @Inject private Config config;     
+    @Inject private Config1 config;     
     private static Logger logger = System.getLogger("com.horstmann.codecheck");     
     
     String start2 = "<!DOCTYPE html>\n<html><head>\n"

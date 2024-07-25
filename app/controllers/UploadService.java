@@ -2,6 +2,7 @@ package controllers;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Base64;
 import java.util.Map;
@@ -9,6 +10,8 @@ import java.util.TreeMap;
 
 import javax.inject.Inject;
 import javax.script.ScriptException;
+
+import com.horstmann.codecheck.Util;
 
 import models.CodeCheck;
 
@@ -118,5 +121,43 @@ public class UploadService {
         }
         problemFiles.put(Path.of("edit.key"), editKey.getBytes(StandardCharsets.UTF_8));
         return checkAndSaveProblem(requestPrefix, problem, problemFiles);
+    }
+
+    public String responseUploadProblem(Path savedPath, String requestPrefix, String problem, String editKey) 
+            throws IOException, InterruptedException, NoSuchMethodException, ScriptException {
+        byte[] contents = Files.readAllBytes(savedPath);
+        Map<Path, byte[]> problemFiles = Util.unzip(contents);
+        problemFiles = UploadService.fixZip(problemFiles);
+        Path editKeyPath = Path.of("edit.key");
+        if (!problemFiles.containsKey(editKeyPath)) 
+            problemFiles.put(editKeyPath, editKey.getBytes(StandardCharsets.UTF_8));
+        return checkAndSaveProblem(requestPrefix, problem, problemFiles);
+    }
+
+    public String[] problemUrlEditKeySubmit(String requestPrefix, String problem, String editKey) 
+            throws IOException {
+        Map<Path, byte[]> problemFiles = codeCheck.loadProblem(repo, problem);
+        Path editKeyPath = Path.of("edit.key");
+        if (!problemFiles.containsKey(editKeyPath)) 
+            // return badRequest("Wrong edit key " + editKey + " for problem " + problem);
+            return new String[]{"0"};
+        String correctEditKey = new String(problemFiles.get(editKeyPath), StandardCharsets.UTF_8);
+        if (!editKey.equals(correctEditKey.trim())) {
+            // return badRequest("Wrong edit key " + editKey + " for problem " + problem);
+            return new String[]{"0"};
+        }
+        Map<String, String> filesAndContents = new TreeMap<>();
+        for (Map.Entry<Path, byte[]> entries : problemFiles.entrySet()) {
+            Path p = entries.getKey();
+            if (!p.getName(0).toString().equals("_outputs")) {
+                //if (p.getNameCount() == 1)
+                    filesAndContents.put(p.toString(), new String(entries.getValue(), StandardCharsets.UTF_8));
+                //else
+                //    return badRequest("Cannot edit problem with directories");
+            }
+        }
+        filesAndContents.remove("edit.key");
+        String problemUrl = createProblemUrl(requestPrefix, problem, problemFiles);
+        return new String[]{problemUrl, filesAndContents};
     }
 }

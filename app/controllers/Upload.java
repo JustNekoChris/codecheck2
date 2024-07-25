@@ -82,14 +82,7 @@ public class Upload extends Controller {
                 badRequest("No problem id");
             Http.MultipartFormData.FilePart<TemporaryFile> tempZipPart = body.getFile("file");
             TemporaryFile tempZipFile = tempZipPart.getRef();
-            Path savedPath = tempZipFile.path();
-            byte[] contents = Files.readAllBytes(savedPath);
-            Map<Path, byte[]> problemFiles = Util.unzip(contents);
-            problemFiles = UploadService.fixZip(problemFiles);
-            Path editKeyPath = Path.of("edit.key");
-            if (!problemFiles.containsKey(editKeyPath)) 
-                problemFiles.put(editKeyPath, editKey.getBytes(StandardCharsets.UTF_8));
-            String response = uploadService.checkAndSaveProblem(models.Util.prefix(request), problem, problemFiles);
+            String response = uploadService.responseUploadProblem(tempZipFile.path(), models.Util.prefix(request), problem, editKey);
             return ok(response).as("text/html").addingToSession(request, "pid", problem);           
         } catch (Exception ex) {
             return internalServerError(Util.getStackTrace(ex));
@@ -127,6 +120,4 @@ public class Upload extends Controller {
             return internalServerError(Util.getStackTrace(ex));
         }
     }
-
-    
 }
