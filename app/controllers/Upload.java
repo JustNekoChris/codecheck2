@@ -49,7 +49,7 @@ public class Upload extends Controller {
         try {
             if (problem == null)
                 badRequest("No problem id");
-            String response = uploadService.resultUploadFiles(request.body().asFormUrlEncoded(), problem, models.Util.prefix(request), editKey);
+            String response = uploadService.resultUploadFiles(request.body().asFormUrlEncoded(), problem, controllers.Util.prefix(request), editKey);
             return ok(response).as("text/html").addingToSession(request, "pid", problem);
         } catch (Exception ex) {
             return internalServerError(Util.getStackTrace(ex));
@@ -83,7 +83,7 @@ public class Upload extends Controller {
                 badRequest("No problem id");
             Http.MultipartFormData.FilePart<TemporaryFile> tempZipPart = body.getFile("file");
             TemporaryFile tempZipFile = tempZipPart.getRef();
-            String response = uploadService.responseUploadProblem(tempZipFile.path(), models.Util.prefix(request), problem, editKey);
+            String response = uploadService.responseUploadProblem(tempZipFile.path(), controllers.Util.prefix(request), problem, editKey);
             return ok(response).as("text/html").addingToSession(request, "pid", problem);           
         } catch (Exception ex) {
             return internalServerError(Util.getStackTrace(ex));
@@ -113,7 +113,7 @@ public class Upload extends Controller {
                 }
             }
             filesAndContents.remove("edit.key");
-            String problemUrl = uploadService.createProblemUrl(models.Util.prefix(request), problem, problemFiles);
+            String problemUrl = uploadService.createProblemUrl(controllers.Util.prefix(request), problem, problemFiles);
             return ok(views.html.edit.render(problem, filesAndContents, correctEditKey, problemUrl));
         } catch (IOException ex) {
             return badRequest("Problem not found: " + problem);

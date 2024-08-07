@@ -68,7 +68,7 @@ public class LTIProblem extends Controller {
 
             String document = ltiProblemService.launchCodeCheckDocument(ltiNode, repo, problemName, ccid);
             
-            Http.Cookie newCookie = models.Util.buildCookie("ccid", ccid);         
+            Http.Cookie newCookie = controllers.Util.buildCookie("ccid", ccid);         
             return ok(document).withCookies(newCookie).as("text/html");
         }  catch (Exception ex) {
             logger.log(System.Logger.Level.ERROR, "launchCodeCheck: Cannot load problem " + repo + "/" + problemName, ex);
@@ -86,7 +86,7 @@ public class LTIProblem extends Controller {
 
             String result = ltiProblemService.launchTracerResult(ltiNode, repo, problemName, ccid);
 
-            Http.Cookie newCookie = models.Util.buildCookie("ccid", ccid);         
+            Http.Cookie newCookie = controllers.Util.buildCookie("ccid", ccid);         
             return ok(result).withCookies(newCookie).as("text/html");
         }  catch (Exception ex) {
             logger.log(System.Logger.Level.ERROR, "launchTracer: Cannot load problem " + repo + "/" + problemName, ex);

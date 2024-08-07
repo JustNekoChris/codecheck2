@@ -6,6 +6,8 @@ import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Arrays;
+import java.lang.System.Logger;
+import java.lang.System.Logger.Level;
 
 import javax.inject.Inject;
 import javax.inject.Singleton;
@@ -19,7 +21,7 @@ import com.amazonaws.services.s3.model.ObjectMetadata;
 import com.horstmann.codecheck.Util;
 import com.typesafe.config.Config;
 
-import play.Logger;
+// import play.Logger;
 
 // TODO Use DI configuration to avoid this delegation
 
@@ -56,7 +58,7 @@ interface ProblemConnection {
 class ProblemS3Connection implements ProblemConnection {
     private String bucketSuffix = null;
     private AmazonS3 amazonS3;
-    private static Logger.ALogger logger = Logger.of("com.horstmann.codecheck");
+    private static Logger logger = System.getLogger("com.horstmann.codecheck");
 
     public ProblemS3Connection(Config config) {
         String awsAccessKey = config.getString("com.horstmann.codecheck.aws.accessKey");
@@ -77,7 +79,7 @@ class ProblemS3Connection implements ProblemConnection {
         try {
             amazonS3.putObject(bucket, key, file.toFile());
         } catch (AmazonS3Exception ex) {
-            logger.error("S3Connection.putToS3: Cannot put " + file + " to " + bucket);
+            logger.log(Level.ERROR, "S3Connection.putToS3: Cannot put " + file + " to " + bucket);
             throw ex;
         }
     }
@@ -87,7 +89,7 @@ class ProblemS3Connection implements ProblemConnection {
         try {
             amazonS3.putObject(bucket, key, contents);
         } catch (AmazonS3Exception ex) {
-            logger.error("S3Connection.putToS3: Cannot put " + contents.replaceAll("\n", "|").substring(0, Math.min(50, contents.length())) + "... to " + bucket);
+            logger.log(Level.ERROR, "S3Connection.putToS3: Cannot put " + contents.replaceAll("\n", "|").substring(0, Math.min(50, contents.length())) + "... to " + bucket);
             throw ex;
         }
     }
@@ -103,7 +105,7 @@ class ProblemS3Connection implements ProblemConnection {
             }                 
         } catch (AmazonS3Exception ex) {
             String bytes = Arrays.toString(contents);
-            logger.error("S3Connection.putToS3: Cannot put " + bytes.substring(0, Math.min(50, bytes.length())) + "... to " + bucket);
+            logger.log(Level.ERROR, "S3Connection.putToS3: Cannot put " + bytes.substring(0, Math.min(50, bytes.length())) + "... to " + bucket);
             throw ex;                
         }
     }
@@ -113,7 +115,7 @@ class ProblemS3Connection implements ProblemConnection {
         try {
             amazonS3.deleteObject(bucket, key);
         } catch (AmazonS3Exception ex) {
-            logger.error("S3Connection.deleteFromS3: Cannot delete " + bucket);
+            logger.log(Level.ERROR, "S3Connection.deleteFromS3: Cannot delete " + bucket);
             throw ex;
         }            
     }
@@ -129,7 +131,7 @@ class ProblemS3Connection implements ProblemConnection {
                 bytes = in.readAllBytes();
             }
         } catch (AmazonS3Exception ex) {
-            logger.error("S3Connection.readFromS3: Cannot read " + key + " from " + bucket);
+            logger.log(Level.ERROR, "S3Connection.readFromS3: Cannot read " + key + " from " + bucket);
             throw ex;
         }
         return bytes;            
@@ -138,14 +140,14 @@ class ProblemS3Connection implements ProblemConnection {
 
 class ProblemLocalConnection implements ProblemConnection {
     private Path root;
-    private static Logger.ALogger logger = Logger.of("com.horstmann.codecheck");
+    private static Logger logger = System.getLogger("com.horstmann.codecheck");
 
     public ProblemLocalConnection(Config config) {
         this.root = Path.of(config.getString("com.horstmann.codecheck.s3.local"));
         try {
            Files.createDirectories(root);            
         } catch (IOException ex) {
-            logger.error("Cannot create " + root);
+            logger.log(Level.ERROR, "Cannot create " + root);
         } 
     }
 
@@ -157,7 +159,7 @@ class ProblemLocalConnection implements ProblemConnection {
             Files.write(newFilePath, contents);
         } catch (IOException ex) {
             String bytes = Arrays.toString(contents);
-            logger.error("ProblemLocalConnection.write : Cannot put " + bytes.substring(0, Math.min(50, bytes.length())) + "... to " + repo);
+            logger.log(Level.ERROR, "ProblemLocalConnection.write : Cannot put " + bytes.substring(0, Math.min(50, bytes.length())) + "... to " + repo);
             throw ex;                   
         }
 
@@ -169,7 +171,7 @@ class ProblemLocalConnection implements ProblemConnection {
         try {
             Util.deleteDirectory(directoryPath);
         } catch (IOException ex) {
-            logger.error("ProblemLocalConnection.delete : Cannot delete " + repo);
+            logger.log(Level.ERROR, "ProblemLocalConnection.delete : Cannot delete " + repo);
             throw ex;
         }
     }
@@ -181,7 +183,7 @@ class ProblemLocalConnection implements ProblemConnection {
             Path filePath = repoPath.resolve(key + ".zip");
             result = Files.readAllBytes(filePath); 
         } catch (IOException ex) {
-            logger.error("ProblemLocalConnection.read : Cannot read " + key + " from " + repo);
+            logger.log(Level.ERROR, "ProblemLocalConnection.read : Cannot read " + key + " from " + repo);
             throw ex;                
         }
         

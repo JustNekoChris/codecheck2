@@ -16,6 +16,8 @@ import java.util.TreeMap;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 import java.util.zip.ZipOutputStream;
+import java.lang.System.Logger;
+import java.lang.System.Logger.Level;
 
 import javax.inject.Inject;
 import javax.inject.Singleton;
@@ -32,12 +34,12 @@ import com.horstmann.codecheck.Util;
 // import com.typesafe.config.Config;
 
 import jdk.security.jarsigner.JarSigner;
-import play.Logger;
+// import play.Logger;
 // import play.api.Environment;
 
 @Singleton
 public class CodeCheck {
-    private static Logger.ALogger logger = Logger.of("com.horstmann.codecheck");    
+    private static Logger logger = System.getLogger("com.horstmann.codecheck");    
     private ProblemConnector probConn;
     private JarSigner signer;
     private ResourceLoader resourceLoader;
@@ -53,7 +55,7 @@ public class CodeCheck {
             KeyStore.PrivateKeyEntry pkEntry = (KeyStore.PrivateKeyEntry) ks.getEntry("codecheck", protParam);
             signer = new JarSigner.Builder(pkEntry).build();            
         } catch (Exception e) {
-            logger.warn("Cannot load keystore");
+            logger.log(Level.WARNING, "Cannot load keystore");
         }
     }
     

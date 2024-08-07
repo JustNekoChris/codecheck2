@@ -43,7 +43,7 @@ public class Check extends Controller {
                 Optional<Http.Cookie> ccidCookie = request.getCookie("ccid");
                 String ccid = ccidCookie.map(Http.Cookie::value).orElse(com.horstmann.codecheck.Util.createPronouncableUID());
                 String[] result = checkService.checkHTMLreport(ccid, params);
-                Http.Cookie newCookie = models.Util.buildCookie("ccid", result[0]);
+                Http.Cookie newCookie = controllers.Util.buildCookie("ccid", result[0]);
                 return ok(result[1]).withCookies(newCookie).as("text/html");
             }
             catch (Exception ex) {
@@ -105,7 +105,7 @@ public class Check extends Controller {
                 Optional<Http.Cookie> ccidCookie = request.getCookie("ccid");
                 String ccid = ccidCookie.map(Http.Cookie::value).orElse(com.horstmann.codecheck.Util.createPronouncableUID());
                 ObjectNode result = checkService.checkNJSResult(ccid, params);
-                Http.Cookie newCookie = models.Util.buildCookie("ccid", ccid);
+                Http.Cookie newCookie = controllers.Util.buildCookie("ccid", ccid);
                 return ok(result).withCookies(newCookie).as("application/json");
             } catch (Exception ex) {
                 return internalServerError(Util.getStackTrace(ex));
