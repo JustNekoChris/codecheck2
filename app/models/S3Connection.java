@@ -11,6 +11,8 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.lang.System.Logger;
+import java.lang.System.Logger.Level;
 
 import javax.inject.Inject;
 import javax.inject.Singleton;
@@ -43,7 +45,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.typesafe.config.Config;
 
-import play.Logger;
+// import play.Logger;
 
 @Singleton
 public class S3Connection {
@@ -51,7 +53,7 @@ public class S3Connection {
     private String bucketSuffix = null;
     private AmazonS3 amazonS3;
     private AmazonDynamoDB amazonDynamoDB;
-    private static Logger.ALogger logger = Logger.of("com.horstmann.codecheck");
+    private static Logger logger = System.getLogger("com.horstmann.codecheck");
     
     public static class OutOfOrderException extends RuntimeException {}
     
@@ -103,7 +105,7 @@ public class S3Connection {
         try {
             getS3Connection().putObject(bucket, key, file.toFile());
         } catch (AmazonS3Exception ex) {
-            logger.error("S3Connection.putToS3: Cannot put " + file + " to " + bucket);
+            logger.log(Level.ERROR, "S3Connection.putToS3: Cannot put " + file + " to " + bucket);
             throw ex;
         }
     }
@@ -114,7 +116,7 @@ public class S3Connection {
         try {
             getS3Connection().putObject(bucket, key, contents);
         } catch (AmazonS3Exception ex) {
-            logger.error("S3Connection.putToS3: Cannot put " + contents.replaceAll("\n", "|").substring(0, Math.min(50, contents.length())) + "... to " + bucket);
+            logger.log(Level.ERROR, "S3Connection.putToS3: Cannot put " + contents.replaceAll("\n", "|").substring(0, Math.min(50, contents.length())) + "... to " + bucket);
             throw ex;
         }
     }
@@ -131,7 +133,7 @@ public class S3Connection {
             } 
         } catch (AmazonS3Exception ex) {
             String bytes = Arrays.toString(contents);
-            logger.error("S3Connection.putToS3: Cannot put " + bytes.substring(0, Math.min(50, bytes.length())) + "... to " + bucket);
+            logger.log(Level.ERROR, "S3Connection.putToS3: Cannot put " + bytes.substring(0, Math.min(50, bytes.length())) + "... to " + bucket);
             throw ex;
         }
     }
@@ -142,7 +144,7 @@ public class S3Connection {
         try {
            getS3Connection().deleteObject(bucket, key);
         } catch (AmazonS3Exception ex) {
-            logger.error("S3Connection.deleteFromS3: Cannot delete " + bucket);
+            logger.log(Level.ERROR, "S3Connection.deleteFromS3: Cannot delete " + bucket);
             throw ex;
         }
     }
@@ -159,7 +161,7 @@ public class S3Connection {
                 bytes = in.readAllBytes();
             }
         } catch (AmazonS3Exception ex) {
-            logger.error("S3Connection.readFromS3: Cannot read " + problem + " from " + bucket);
+            logger.log(Level.ERROR, "S3Connection.readFromS3: Cannot read " + problem + " from " + bucket);
             throw ex;
         }
         return bytes;
@@ -280,7 +282,7 @@ public class S3Connection {
                     .withItem(Item.fromJSON(obj.toString()))
             );
         }catch(IllegalArgumentException ex){
-            logger.warn("writeJsonObjectToDynamoDB caused the error message: " + ex.getMessage());
+            logger.log(Level.WARNING, "writeJsonObjectToDynamoDB caused the error message: " + ex.getMessage());
         }
     }
 
@@ -303,7 +305,7 @@ public class S3Connection {
             return true;
         } catch(ConditionalCheckFailedException e) {
             // https://github.com/aws/aws-sdk-java/issues/1945
-            logger.warn("writeNewerJsonObjectToDynamoDB: " + e.getMessage() + " " + obj);
+            logger.log(Level.WARNING, "writeNewerJsonObjectToDynamoDB: " + e.getMessage() + " " + obj);
             return false;
         }   
     }

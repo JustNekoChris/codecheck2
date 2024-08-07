@@ -16,6 +16,8 @@ import java.util.Map;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.lang.System.Logger;
+import java.lang.System.Logger.Level;
 
 import javax.inject.Inject;
 import javax.inject.Singleton;
@@ -33,13 +35,15 @@ import oauth.signpost.exception.OAuthCommunicationException;
 import oauth.signpost.exception.OAuthExpectationFailedException;
 import oauth.signpost.exception.OAuthMessageSignerException;
 import oauth.signpost.http.HttpParameters;
-import play.Logger;
+// import play.Logger;
 import play.mvc.Http;
+
+import controllers.Util;
 
 @Singleton
 public class LTI {
     @Inject private AssignmentConnector assignmentConn;
-    private static Logger.ALogger logger = Logger.of("com.horstmann.codecheck");
+    private static Logger logger = System.getLogger("com.horstmann.codecheck");
     
     public boolean validate(Http.Request request) {
         final String OAUTH_KEY_PARAMETER = "oauth_consumer_key";
@@ -66,7 +70,7 @@ public class LTI {
           oav.validateMessage(oam, acc);
           return true;
         } catch (Exception e) {
-            logger.error("Did not validate: " + e.getLocalizedMessage() + "\nurl: " + url + "\nentries: " + entries);
+            logger.log(Level.ERROR, "Did not validate: " + e.getLocalizedMessage() + "\nurl: " + url + "\nentries: " + entries);
             return false;
         }
     }
@@ -77,9 +81,9 @@ public class LTI {
         try {
             ObjectNode result = assignmentConn.readJsonObjectFromDB("CodeCheckLTICredentials", "oauth_consumer_key", oauthConsumerKey);
             if (result != null) sharedSecret = result.get("shared_secret").asText();
-            else logger.warn("No shared secret for consumer key " + oauthConsumerKey);
+            else logger.log(Level.WARNING, "No shared secret for consumer key " + oauthConsumerKey);
         } catch (IOException e) {
-            logger.warn("Could not read CodeCheckLTICredentials");
+            logger.log(Level.WARNING, "Could not read CodeCheckLTICredentials");
             // Return empty string
         }       
         return sharedSecret;
@@ -129,7 +133,7 @@ public class LTI {
         out.close();
         // request.connect();
         if (request.getResponseCode() != 200)
-            logger.warn("passbackGradeToLMS: Not successful" + request.getResponseCode() + " " + request.getResponseMessage());
+            logger.log(Level.WARNING, "passbackGradeToLMS: Not successful" + request.getResponseCode() + " " + request.getResponseMessage());
         try {
             InputStream in = request.getInputStream();
             String body = new String(in.readAllBytes(), StandardCharsets.UTF_8);
@@ -140,12 +144,12 @@ public class LTI {
             if (matcher2.find()) message += ": " + matcher2.group(1);
             if (message.length() == 0) message = body;
             if (!body.contains("<imsx_codeMajor>success</imsx_codeMajor>"))
-                logger.warn("passbackGradeToLMS: Not successful " + body);
+                logger.log(Level.WARNING, "passbackGradeToLMS: Not successful " + body);
             return message;         
         } catch (Exception e) {         
             InputStream in = request.getErrorStream();
             String body = new String(in.readAllBytes(), StandardCharsets.UTF_8);
-            logger.warn("passbackGradeToLMS: Response error " + e.getMessage() + ": " + body);
+            logger.log(Level.WARNING, "passbackGradeToLMS: Response error " + e.getMessage() + ": " + body);
             return body;
         }
     }           

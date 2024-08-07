@@ -14,6 +14,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import java.lang.System.Logger;
+import java.lang.System.Logger.Level;
 
 import javax.inject.Inject;
 import javax.inject.Singleton;
@@ -44,7 +46,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.horstmann.codecheck.Util;
 import com.typesafe.config.Config;
 
-import play.Logger;
+// import play.Logger;
 
 @Singleton public class AssignmentConnector {
     private AssignmentConnection delegate;
@@ -104,7 +106,7 @@ interface AssignmentConnection {
 
 class AssignmentDynamoDBConnection implements AssignmentConnection {
     private AmazonDynamoDB amazonDynamoDB;
-    private static Logger.ALogger logger = Logger.of("com.horstmann.codecheck");
+    private static Logger logger = System.getLogger("com.horstmann.codecheck");
     public static class OutOfOrderException extends RuntimeException {}
 
     public AssignmentDynamoDBConnection(Config config) {
@@ -218,7 +220,7 @@ class AssignmentDynamoDBConnection implements AssignmentConnection {
             return true;
         } catch(ConditionalCheckFailedException e) {
             // https://github.com/aws/aws-sdk-java/issues/1945
-            logger.warn("writeNewerJsonObjectToDB: " + e.getMessage() + " " + obj);
+            logger.log(Level.WARNING, "writeNewerJsonObjectToDB: " + e.getMessage() + " " + obj);
             return false;
         }   
     }
@@ -226,14 +228,14 @@ class AssignmentDynamoDBConnection implements AssignmentConnection {
 
 class AssignmentLocalConnection implements AssignmentConnection {
     private Path root;
-    private static Logger.ALogger logger = Logger.of("com.horstmann.codecheck");
+    private static Logger logger = System.getLogger("com.horstmann.codecheck");
     
     public AssignmentLocalConnection(Config config) {        
         this.root = Path.of(config.getString("com.horstmann.codecheck.dynamodb.local"));
         try {
            Files.createDirectories(root);            
         } catch (IOException ex) {
-            logger.error("Cannot create " + root);
+            logger.log(Level.ERROR, "Cannot create " + root);
         } 
     }
 
@@ -248,7 +250,7 @@ class AssignmentLocalConnection implements AssignmentConnection {
             String result = Files.readString(jsonFile);
             return result;
         } catch (IOException ex) {
-            logger.warn("AssignmentLocalConnection.readJsonStringFromDB - 3 para: Cannot read " + jsonFile.toString());
+            logger.log(Level.WARNING, "AssignmentLocalConnection.readJsonStringFromDB - 3 para: Cannot read " + jsonFile.toString());
             return null;
         }
     }
@@ -266,7 +268,7 @@ class AssignmentLocalConnection implements AssignmentConnection {
                 ObjectNode result = (ObjectNode)(new ObjectMapper().readTree(content));
                 return result;
             } catch (JsonProcessingException ex) {
-                logger.warn("AssignmentConnector.readNewestJsonObjectFromDB: cannot read " + latest.toString() + "***File content: " + content);
+                logger.log(Level.WARNING, "AssignmentConnector.readNewestJsonObjectFromDB: cannot read " + latest.toString() + "***File content: " + content);
                 return null;
             } 
         } catch (IOException ex) {
@@ -285,7 +287,7 @@ class AssignmentLocalConnection implements AssignmentConnection {
             String result = Files.readString(jsonFile);
             return result;
         } catch (IOException ex) {
-            logger.warn("AssignmentLocalConnection.readJsonStringFromDB - 5 para: Cannot read " + jsonFile.toString());
+            logger.log(Level.WARNING, "AssignmentLocalConnection.readJsonStringFromDB - 5 para: Cannot read " + jsonFile.toString());
             return null;
         }
     }
@@ -307,7 +309,7 @@ class AssignmentLocalConnection implements AssignmentConnection {
                 }
             }
         } catch (IOException | org.json.simple.parser.ParseException ex){
-            logger.warn(Util.getStackTrace(ex));
+            logger.log(Level.WARNING, Util.getStackTrace(ex));
         }    
         return itemMap;
     }
@@ -317,7 +319,7 @@ class AssignmentLocalConnection implements AssignmentConnection {
         try {
             Files.createDirectories(tablePath); 
         } catch (IOException ex) {
-            logger.error(tableName + " directory could not be generated");
+            logger.log(Level.ERROR, tableName + " directory could not be generated");
         }
         try {
             switch (tableName) {
@@ -328,7 +330,7 @@ class AssignmentLocalConnection implements AssignmentConnection {
                         Files.writeString(assignment, obj.toString());
                         break;
                     } catch (IOException ex) {
-                        logger.warn(ex.getMessage());
+                        logger.log(Level.WARNING, ex.getMessage());
                     }
                 case "CodeCheckLTICredentials": // primary key == oauth_consumer_key
                     try {
@@ -338,7 +340,7 @@ class AssignmentLocalConnection implements AssignmentConnection {
 
                         break;
                     } catch (IOException ex) {
-                        logger.warn(ex.getMessage());
+                        logger.log(Level.WARNING, ex.getMessage());
                     }
                 case "CodeCheckLTIResources": // primary key == resourceID
                     try {
@@ -348,7 +350,7 @@ class AssignmentLocalConnection implements AssignmentConnection {
 
                         break;
                     } catch (IOException ex) {
-                        logger.warn(ex.getMessage());
+                        logger.log(Level.WARNING, ex.getMessage());
                     }
                 case "CodeCheckSubmissions": // primary key == submissionID, sortKey == submittedAt
                     try {
@@ -361,7 +363,7 @@ class AssignmentLocalConnection implements AssignmentConnection {
                         Files.writeString(submitted, obj.toString());
                         break;
                     } catch (IOException ex) {
-                        logger.warn(ex.getMessage());
+                        logger.log(Level.WARNING, ex.getMessage());
                     }
                 case "CodeCheckWork": // primary key == assignmentID, sortkey == workID
                     try {
@@ -375,7 +377,7 @@ class AssignmentLocalConnection implements AssignmentConnection {
                         Files.writeString(work, obj.toString());
                         break;
                     } catch (IOException ex) {
-                        logger.warn(ex.getMessage());
+                        logger.log(Level.WARNING, ex.getMessage());
                     }
                 case "CodeCheckComments": // primary key == assignmentID, sortkey == workID
                     try {
@@ -392,14 +394,14 @@ class AssignmentLocalConnection implements AssignmentConnection {
                         Files.writeString(work, commentNode.toString());
                         break;
                     } catch (IOException ex) {
-                        logger.warn("AssignmentID not found.");
+                        logger.log(Level.WARNING, "AssignmentID not found.");
                     }
                 default:
-                    logger.warn("Invalid Table Name.");
+                    logger.log(Level.WARNING, "Invalid Table Name.");
                     break;
             }
         } catch (NullPointerException ex) {
-            logger.error(Util.getStackTrace(ex));
+            logger.log(Level.ERROR, Util.getStackTrace(ex));
         }
     }
     public boolean writeNewerJsonObjectToDB(String tableName, ObjectNode obj, String primaryKeyName, String timeStampKeyName) throws IOException {
@@ -422,7 +424,7 @@ class AssignmentLocalConnection implements AssignmentConnection {
                 writeFileToNewestTimeStamp(codeCheckWork, obj, timeStampKeyName);
             }
         } catch (Exception ex) {
-            logger.warn(Util.getStackTrace(ex));
+            logger.log(Level.WARNING, Util.getStackTrace(ex));
             return false;
         }
         
@@ -464,7 +466,7 @@ class AssignmentLocalConnection implements AssignmentConnection {
                 }
             } 
         } catch (IOException ex) {
-            logger.warn("writeFileToNewestTimeStamp: " + ex.getMessage());
+            logger.log(Level.WARNING, "writeFileToNewestTimeStamp: " + ex.getMessage());
             try { Thread.sleep(1000); } catch (InterruptedException ex2) {}
         }
     }
