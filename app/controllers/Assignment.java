@@ -229,7 +229,7 @@ public class Assignment extends Controller {
     public Result work(Http.Request request, String assignmentID, String ccid, String editKey, 
             boolean isStudent) 
             throws IOException, GeneralSecurityException {
-        String prefix = models.Util.prefix(request);
+        String prefix = controllers.Util.prefix(request);
         String workID = "";
         boolean editKeySaved = true;
 
@@ -299,8 +299,8 @@ public class Assignment extends Controller {
             assignmentNode.put("returnToWorkURL", returnToWorkURL); 
             assignmentNode.put("editKeySaved", editKeySaved);
             assignmentNode.put("sentAt", Instant.now().toString());
-            Http.Cookie newCookie1 = models.Util.buildCookie("ccid", ccid);
-            Http.Cookie newCookie2 = models.Util.buildCookie("cckey", editKey);
+            Http.Cookie newCookie1 = controllers.Util.buildCookie("ccid", ccid);
+            Http.Cookie newCookie2 = controllers.Util.buildCookie("cckey", editKey);
             return ok(views.html.workAssignment.render(assignmentNode.toString(), work, ccid, lti))
                     .withCookies(newCookie1, newCookie2);
         }
@@ -391,7 +391,7 @@ public class Assignment extends Controller {
         }
         assignmentConn.writeJsonObjectToDB("CodeCheckAssignments", params);
 
-        String prefix = models.Util.prefix(request);
+        String prefix = controllers.Util.prefix(request);
         String assignmentURL = prefix + "/private/assignment/" + assignmentID + "/" + editKey;
         params.put("viewAssignmentURL", assignmentURL);
         
