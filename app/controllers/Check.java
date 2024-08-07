@@ -1,10 +1,10 @@
 package controllers;
 
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
+// import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.Base64;
+// import java.util.Base64;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
@@ -29,6 +29,7 @@ import play.libs.concurrent.HttpExecution;
 import play.mvc.Controller;
 import play.mvc.Http;
 import play.mvc.Result;
+import service.CheckService;
 
 public class Check extends Controller {
     private CodecheckExecutionContext ccec; 

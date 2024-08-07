@@ -29,11 +29,11 @@ import com.horstmann.codecheck.Plan;
 import com.horstmann.codecheck.Problem;
 import com.horstmann.codecheck.ResourceLoader;
 import com.horstmann.codecheck.Util;
-import com.typesafe.config.Config;
+// import com.typesafe.config.Config;
 
 import jdk.security.jarsigner.JarSigner;
 import play.Logger;
-import play.api.Environment;
+// import play.api.Environment;
 
 @Singleton
 public class CodeCheck {
@@ -42,18 +42,9 @@ public class CodeCheck {
     private JarSigner signer;
     private ResourceLoader resourceLoader;
     
-    @Inject public CodeCheck(Config config, ProblemConnector probConn, Environment playEnv) {
+    @Inject public CodeCheck(controllers.Config config, ProblemConnector probConn){
         this.probConn = probConn;
-        resourceLoader = new ResourceLoader() {
-            @Override
-            public InputStream loadResource(String path) throws IOException {
-                return playEnv.classLoader().getResourceAsStream("public/resources/" + path);
-            }
-            @Override
-            public String getProperty(String key) {
-                return config.hasPath(key) ? config.getString(key) : null;
-            }
-        };
+        this.resourceLoader = config;
         try {
             String keyStorePath = config.getString("com.horstmann.codecheck.storeLocation");
             char[] password = config.getString("com.horstmann.codecheck.storePassword").toCharArray();

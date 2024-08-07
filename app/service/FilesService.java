@@ -1,4 +1,4 @@
-package controllers;
+package service;
 
 import java.io.IOException;
 import java.lang.System.Logger;
@@ -16,11 +16,12 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.horstmann.codecheck.Problem;
 import com.horstmann.codecheck.Util;
 
+import controllers.Config;
 import models.CodeCheck;
 
 public class FilesService {
     @Inject private CodeCheck codeCheck;    
-    @Inject private Config1 config;     
+    @Inject private Config config;     
     private static Logger logger = System.getLogger("com.horstmann.codecheck");     
     
     String start2 = "<!DOCTYPE html>\n<html><head>\n"

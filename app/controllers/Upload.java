@@ -21,6 +21,7 @@ import play.libs.Files.TemporaryFile;
 import play.mvc.Controller;
 import play.mvc.Http;
 import play.mvc.Result;
+import service.UploadService;
 
 public class Upload extends Controller {
     final String repo = "ext";
