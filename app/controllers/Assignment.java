@@ -68,6 +68,7 @@ CodeCheckComments
    PLAY_SESSION
 */
 
+
 import java.io.IOException;
 import java.net.URLEncoder;
 import java.security.GeneralSecurityException;
@@ -78,6 +79,8 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.lang.Service.Logger;
+import java.lang.Service.Logger.Level;
 
 import javax.inject.Inject;
 
@@ -88,7 +91,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.horstmann.codecheck.Util;
 
 import models.AssignmentConnector;
-import play.Logger;
+// import play.Logger;
 import play.mvc.Controller;
 import play.mvc.Http;
 import play.mvc.Result;
