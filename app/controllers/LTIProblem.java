@@ -28,7 +28,7 @@ import models.LTI;
 import play.mvc.Controller;
 import play.mvc.Http;
 import play.mvc.Result;
-import service.LTIProblemService;
+import services.LTIProblemService;
 
 public class LTIProblem extends Controller {
     @Inject private AssignmentConnector assignmentConn;

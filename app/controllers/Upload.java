@@ -2,18 +2,12 @@ package controllers;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Base64;
 import java.util.Map;
 import java.util.TreeMap;
 
 import javax.inject.Inject;
-import javax.script.ScriptException;
 
-import com.horstmann.codecheck.Plan;
-import com.horstmann.codecheck.Problem;
-import com.horstmann.codecheck.Report;
 import com.horstmann.codecheck.Util;
 
 import models.CodeCheck;
@@ -21,7 +15,7 @@ import play.libs.Files.TemporaryFile;
 import play.mvc.Controller;
 import play.mvc.Http;
 import play.mvc.Result;
-import service.UploadService;
+import services.UploadService;
 
 public class Upload extends Controller {
     final String repo = "ext";

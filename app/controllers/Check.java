@@ -29,7 +29,7 @@ import play.libs.concurrent.HttpExecution;
 import play.mvc.Controller;
 import play.mvc.Http;
 import play.mvc.Result;
-import service.CheckService;
+import services.CheckService;
 
 public class Check extends Controller {
     private CodecheckExecutionContext ccec; 
