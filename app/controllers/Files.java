@@ -1,32 +1,16 @@
 package controllers;
 
-import java.io.IOException;
-import java.nio.file.Path;
-import java.util.Map;
-import java.util.Optional;
-
-import javax.inject.Inject;
-import javax.script.ScriptException;
-
-import com.horstmann.codecheck.Problem;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.horstmann.codecheck.Util;
-
 import play.mvc.Controller;
 import play.mvc.Http;
 import play.mvc.Result;
 import services.FilesService;
 
-
-// No Longer Used
-// import java.net.URL;
-// import java.text.MessageFormat;
-// import java.util.List;
-// import com.fasterxml.jackson.databind.node.ObjectNode;
-// import com.typesafe.config.Config;
-// import models.CodeCheck;
-// import play.Logger;
-// New Classes Added
-// import java.lang.System.Logger;
+import javax.inject.Inject;
+import javax.script.ScriptException;
+import java.io.IOException;
+import java.util.Optional;
 
 public class Files extends Controller {     
     @Inject private FilesService filesService;
@@ -37,9 +21,8 @@ public class Files extends Controller {
             Optional<Http.Cookie> ccidCookie = request.getCookie("ccid");
             ccid = ccidCookie.map(Http.Cookie::value).orElse(Util.createPronouncableUID());
         }
-        String result = filesService.filesHTML2_2(controllers.Util.prefix(request), repo, problemName, ccid);
-        if (result.equals("0")) return badRequest("Cannot load problem " + repo + "/" + problemName);
-        filesService.wakeupChecker();
+        String result = filesService.filesHTML2(controllers.Util.prefix(request), repo, problemName, ccid);
+        if (result == null) return badRequest("Cannot load problem " + repo + "/" + problemName);
         Http.Cookie newCookie = controllers.Util.buildCookie("ccid", ccid);
         return ok(result).withCookies(newCookie).as("text/html");
     }
@@ -50,8 +33,8 @@ public class Files extends Controller {
             Optional<Http.Cookie> ccidCookie = request.getCookie("ccid");
             ccid = ccidCookie.map(Http.Cookie::value).orElse(Util.createPronouncableUID());
         }
-        String result = filesService.tracer2(ccid, filesService.getProblemFiles(problemName, repo, ccid));
-        if (result.equals("0")) return badRequest("Cannot load problem " + repo + "/" + problemName);
+        String result = filesService.tracer(repo, problemName, ccid);
+        if (result == null) return badRequest("Cannot load problem " + repo + "/" + problemName);
         Http.Cookie newCookie = controllers.Util.buildCookie("ccid", ccid);
         return ok(result).withCookies(newCookie).as("text/html");
     }
@@ -64,11 +47,10 @@ public class Files extends Controller {
             Optional<Http.Cookie> ccidCookie = request.getCookie("ccid");
             ccid = ccidCookie.map(Http.Cookie::value).orElse(Util.createPronouncableUID());
         }
-        Map<Path, byte[]> problemFiles = filesService.getProblemFiles(problemName, repo, ccid);
-        if (problemFiles.isEmpty()) return badRequest("Cannot load problem " + repo + "/" + problemName);      
-        Problem problem = new Problem(problemFiles);
+        ObjectNode result = filesService.fileData(repo, problemName, ccid);
+        if (result == null) return badRequest("Cannot load problem " + repo + "/" + problemName);
         Http.Cookie newCookie = controllers.Util.buildCookie("ccid", ccid);
-        return ok(models.Util.toJson(problem.getProblemData())).withCookies(newCookie);
+        return ok(result).withCookies(newCookie);
     }
 
     // TODO: Legacy, also codecheck.js
@@ -79,8 +61,8 @@ public class Files extends Controller {
             Optional<Http.Cookie> ccidCookie = request.getCookie("ccid");
             ccid = ccidCookie.map(Http.Cookie::value).orElse(Util.createPronouncableUID());
         }
-        String result = filesService.filesHTML_2(repo, problemName, ccid); 
-        if (result.equals("0")) return badRequest("Cannot load problem " + repo + "/" + problemName);
+        String result = filesService.filesHTML(repo, problemName, ccid);
+        if (result == null) return badRequest("Cannot load problem " + repo + "/" + problemName);
         Http.Cookie newCookie = controllers.Util.buildCookie("ccid", ccid);
         return ok(result.toString()).withCookies(newCookie).as("text/html");
     }       

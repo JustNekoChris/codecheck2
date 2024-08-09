@@ -9,7 +9,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import javax.script.ScriptException;
 import javax.inject.Inject;
 
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -45,14 +44,15 @@ public class FilesService {
             + "</body>\n" 
             + "</html>";
 
-    public String filesHTML2_2(String url, String repo, String problemName, String ccid) 
-            throws IOException, NoSuchMethodException, ScriptException{
-        Map<Path, byte[]> problemFiles = getProblemFiles(problemName, repo, ccid);
-        if (problemFiles.isEmpty()) // if problemFiles is empty, return "0" to indicate error
-            return "0";
+    public String filesHTML2(String url, String repo, String problemName, String ccid)
+            throws IOException {
+        Map<Path, byte[]> problemFiles = getProblemFiles(repo, problemName, ccid);
+        if (problemFiles.isEmpty()) // if problemFiles is empty, return null to indicate error
+            return null;
         if (problemFiles.containsKey(Path.of("tracer.js")))
-        	return tracer2(ccid, problemFiles);
+        	return tracer(repo, problemName, ccid);
 
+        wakeupChecker();
         Problem problem = new Problem(problemFiles);
         ObjectNode data = models.Util.toJson(problem.getProblemData());
         data.put("url",  url + "/checkNJS");
@@ -92,9 +92,10 @@ public class FilesService {
                                     + "</body>\n"
                                     + "</html>";
     
-	public String tracer2(String ccid, Map<Path, byte[]> problemFiles) throws IOException {
+	public String tracer(String repo, String problemName, String ccid) throws IOException {
+        Map<Path, byte[]> problemFiles = getProblemFiles(repo, problemName, ccid);
         if (problemFiles.isEmpty())
-            return "0";
+            return null;
 		Problem problem = new Problem(problemFiles);
         Problem.DisplayData data = problem.getProblemData();
         StringBuilder result = new StringBuilder();
@@ -108,8 +109,14 @@ public class FilesService {
         return result.toString();
 	}
 
-    public Map<Path, byte[]> getProblemFiles (String problemName, String repo, String ccid) {
-        
+    public ObjectNode fileData(String repo, String problemName, String ccid) throws IOException {
+        Map<Path, byte[]> problemFiles = getProblemFiles(repo, problemName, ccid);
+        if (problemFiles.isEmpty()) return null;
+        Problem problem = new Problem(problemFiles);
+        return models.Util.toJson(problem.getProblemData());
+    }
+
+    private Map<Path, byte[]> getProblemFiles(String repo, String problemName, String ccid) {
         Map<Path, byte[]> problemFiles;
         try {
             problemFiles = codeCheck.loadProblem(repo, problemName, ccid);
@@ -120,9 +127,8 @@ public class FilesService {
         }
         return problemFiles;
     }
-    
 
-    public void wakeupChecker() {
+    private void wakeupChecker() {
         // Wake up the checker
         String path = "com.horstmann.codecheck.comrun.remote"; 
         if (!config.hasPath(path)) return;
@@ -158,11 +164,11 @@ public class FilesService {
     private static String useStart = "<p>Use the following {0,choice,1#file|2#files}:</p>\n";
     private static String provideStart = "<p>Complete the following {0,choice,1#file|2#files}:</p>\n";
 
-    public String filesHTML_2(String repo, String problemName, String ccid) 
-    throws IOException, NoSuchMethodException, ScriptException {
-        Map<Path, byte[]> problemFiles = getProblemFiles(problemName, repo, ccid);
-        if (problemFiles.isEmpty()) // if problemFiles is empty, return "0" to indicate error
-            return "0";
+    public String filesHTML(String repo, String problemName, String ccid)
+            throws IOException {
+        Map<Path, byte[]> problemFiles = getProblemFiles(repo, problemName, ccid);
+        if (problemFiles.isEmpty()) // if problemFiles is empty, return null to indicate error
+            return null;
         Problem problem = new Problem(problemFiles);
         Problem.DisplayData data = problem.getProblemData();
         StringBuilder result = new StringBuilder();
