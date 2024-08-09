@@ -2,6 +2,7 @@ package controllers;
 
 import java.io.IOException;
 // import java.nio.charset.StandardCharsets;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 // import java.util.Base64;
@@ -40,11 +41,26 @@ public class Check extends Controller {
         Map<String, String[]> params = request.body().asFormUrlEncoded();
         return CompletableFuture.supplyAsync(() -> {
             try {
+                Map<Path, String> submissionFiles = new TreeMap<>();
+                String repo = "";
+                String problem = "";
+                String ccid = null;
+                for (String key : params.keySet()) {
+                    String value = params.get(key)[0];
+                    if (key.equals("repo"))
+                        repo = value;
+                    else if (key.equals("problem"))
+                        problem = value;
+                    else if (!key.equals("ccid")) // TODO: For testing of randomization?
+                        ccid = value;
+                    else
+                        submissionFiles.put(Paths.get(key), value);
+                }
                 Optional<Http.Cookie> ccidCookie = request.getCookie("ccid");
-                String ccid = ccidCookie.map(Http.Cookie::value).orElse(com.horstmann.codecheck.Util.createPronouncableUID());
-                String[] result = checkService.checkHTMLreport(ccid, params);
-                Http.Cookie newCookie = controllers.Util.buildCookie("ccid", result[0]);
-                return ok(result[1]).withCookies(newCookie).as("text/html");
+                if (ccid == null) ccid = ccidCookie.map(Http.Cookie::value).orElse(com.horstmann.codecheck.Util.createPronouncableUID());
+                String result = checkService.checkHTML(repo, problem, ccid, submissionFiles);
+                Http.Cookie newCookie = controllers.Util.buildCookie("ccid", ccid);
+                return ok(result).withCookies(newCookie).as("text/html");
             }
             catch (Exception ex) {
                 return internalServerError(Util.getStackTrace(ex));
@@ -61,20 +77,24 @@ public class Check extends Controller {
 	            String contentType = request.contentType().orElse("");
 		        if ("application/x-www-form-urlencoded".equals(contentType)) {
                     params = request.body().asFormUrlEncoded();
-                    return ok(checkService.run_x_www_form_urlencoded(params, submissionFiles)).as("text/plain");
+                    for (String key : params.keySet()) {
+                        String value = params.get(key)[0];
+                        submissionFiles.put(Paths.get(key), value);
+                    }
+                    return ok(checkService.run(submissionFiles)).as("text/plain");
 		        } else if ("multipart/form-data".equals(contentType)) {
 		            play.mvc.Http.MultipartFormData<TemporaryFile> body = request.body().asMultipartFormData();
 		            for (var f : body.getFiles()) {
-	                    System.getLogger("com.horstmann.codecheck.lti").log(System.Logger.Level.INFO, "f=" + f.getKey() + " " + f.getFilename());
+	                    // System.getLogger("com.horstmann.codecheck.lti").log(System.Logger.Level.INFO, "f=" + f.getKey() + " " + f.getFilename());
 		            	String name = f.getFilename();
 		                TemporaryFile tempZipFile = f.getRef();
 		                Path savedPath = tempZipFile.path();
 		                String contents = Util.read(savedPath);
                         submissionFiles.put(Paths.get(name), contents);
 	                }
-	                return ok(checkService.run_form_data(submissionFiles)).as("text/plain");
+	                return ok(checkService.run(submissionFiles)).as("text/plain");
 		        } else if ("application/json".equals(contentType)) {
-			        return ok(checkService.run_json(request.body().asJson(), submissionFiles)).as("application/json");
+			        return ok(checkService.runJSON(request.body().asJson())).as("application/json");
 		        }
 		        else return internalServerError("Bad content type");
             } catch (Exception ex) {
@@ -102,9 +122,26 @@ public class Check extends Controller {
         
         return CompletableFuture.supplyAsync(() -> {
             try {
-                Optional<Http.Cookie> ccidCookie = request.getCookie("ccid");
-                String ccid = ccidCookie.map(Http.Cookie::value).orElse(com.horstmann.codecheck.Util.createPronouncableUID());
-                ObjectNode result = checkService.checkNJSResult(ccid, params);
+                String ccid = null;
+                String repo = "ext";
+                String problem = null;
+                Map<Path, String> submissionFiles = new TreeMap<>();
+                for (String key : params.keySet()) {
+                    String value = params.get(key)[0];
+                    if ("repo".equals(key)) repo = value;
+                    else if ("problem".equals(key)) problem = value;
+                    else if ("ccid".equals(key)) ccid = value; // TODO: For testing of randomization?
+                    else {
+                        Path p = Paths.get(key);
+                        submissionFiles.put(p, value);
+                    }
+                }
+
+                if (ccid == null) {
+                    Optional<Http.Cookie> ccidCookie = request.getCookie("ccid");
+                    ccid = ccidCookie.map(Http.Cookie::value).orElse(com.horstmann.codecheck.Util.createPronouncableUID());
+                }
+                ObjectNode result = checkService.checkNJS(repo, problem, ccid, submissionFiles);
                 Http.Cookie newCookie = controllers.Util.buildCookie("ccid", ccid);
                 return ok(result).withCookies(newCookie).as("application/json");
             } catch (Exception ex) {
