@@ -79,8 +79,8 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.lang.Service.Logger;
-import java.lang.Service.Logger.Level;
+import java.lang.System.Logger;
+import java.lang.System.Logger.Level;
 
 import javax.inject.Inject;
 
@@ -95,104 +95,12 @@ import models.AssignmentConnector;
 import play.mvc.Controller;
 import play.mvc.Http;
 import play.mvc.Result;
+import services.AssignmentService;
 
 public class Assignment extends Controller {
     @Inject private AssignmentConnector assignmentConn;
-    private static Logger.ALogger logger = Logger.of("com.horstmann.codecheck");
-    
-    public static ArrayNode parseAssignment(String assignment) {
-        if (assignment == null || assignment.trim().isEmpty()) 
-            throw new IllegalArgumentException("No assignments");
-        ArrayNode groupsNode = JsonNodeFactory.instance.arrayNode();
-        Pattern problemPattern = Pattern.compile("\\s*(\\S+)(\\s+[0-9.]+%)?(.*)");
-        String[] groups = assignment.split("\\s+-{3,}\\s+");
-        for (int problemGroup = 0; problemGroup < groups.length; problemGroup++) {
-            String[] lines = groups[problemGroup].split("\\n+");
-            if (lines.length == 0) throw new IllegalArgumentException("No problems given");
-            ArrayNode group = JsonNodeFactory.instance.arrayNode();
-            for (int i = 0; i < lines.length; i++) {
-                ObjectNode problem = JsonNodeFactory.instance.objectNode();
-                Matcher matcher = problemPattern.matcher(lines[i]);
-                if (!matcher.matches())
-                    throw new IllegalArgumentException("Bad input " + lines[i]);
-                String problemDescriptor = matcher.group(1); // URL or qid
-                String problemURL;
-                String qid = null;
-                boolean checked = false;
-                if (problemDescriptor.startsWith("https")) problemURL = problemDescriptor;
-                else if (problemDescriptor.startsWith("http")) {
-                    if (!problemDescriptor.startsWith("http://localhost") && !problemDescriptor.startsWith("http://127.0.0.1")) {
-                        problemURL = "https" + problemDescriptor.substring(4);
-                    }
-                    else
-                        problemURL = problemDescriptor;                    
-                }   
-                else if (problemDescriptor.matches("[a-zA-Z0-9_]+(-[a-zA-Z0-9_]+)*")) { 
-                    qid = problemDescriptor;
-                    problemURL = "https://www.interactivities.ws/" + problemDescriptor + ".xhtml";
-                    if (com.horstmann.codecheck.Util.exists(problemURL))
-                        checked = true;
-                    else
-                        problemURL = "https://codecheck.it/files?repo=wiley&problem=" + problemDescriptor;                                                          
-                }
-                else throw new IllegalArgumentException("Bad problem: " + problemDescriptor);
-                if (!checked && !com.horstmann.codecheck.Util.exists(problemURL))
-                    throw new IllegalArgumentException("Cannot find " + problemDescriptor);             
-                problem.put("URL", problemURL);
-                if (qid != null) problem.put("qid", qid);
-                
-                String weight = matcher.group(2);
-                if (weight == null) weight = "100";
-                else weight = weight.trim().replace("%", "");
-                problem.put("weight", Double.parseDouble(weight) / 100);
-
-                String title = matcher.group(3);
-                if (title != null) { 
-                    title = title.trim();
-                    if (!title.isEmpty())
-                        problem.put("title", title);
-                }
-                group.add(problem);
-            }
-            groupsNode.add(group);
-        }
-        return groupsNode;
-    }
-    
-    private static boolean isProblemKeyFor(String key, ObjectNode problem) {        
-        // Textbook repo
-        if (problem.has("qid")) return problem.get("qid").asText().equals(key);
-        String problemURL = problem.get("URL").asText();
-        // Some legacy CodeCheck questions have butchered keys such as 0101407088y6iesgt3rs6k7h0w45haxajn 
-        return problemURL.endsWith(key);
-    }
-             
-    public static double score(ObjectNode assignment, ObjectNode work) {
-        ArrayNode groups = (ArrayNode) assignment.get("problems");      
-        String workID = work.get("workID").asText();
-        ArrayNode problems = (ArrayNode) groups.get(workID.hashCode() % groups.size());
-        ObjectNode submissions = (ObjectNode) work.get("problems");
-        double result = 0;
-        double sum = 0;
-        for (JsonNode p : problems) {
-            ObjectNode problem = (ObjectNode) p;
-            double weight = problem.get("weight").asDouble();
-            sum += weight;
-            for (String key : com.horstmann.codecheck.Util.iterable(submissions.fieldNames())) {
-                if (isProblemKeyFor(key, problem)) {    
-                    ObjectNode submission = (ObjectNode) submissions.get(key);
-                    result += weight * submission.get("score").asDouble();
-                }
-            }           
-        }
-        return sum == 0 ? 0 : result / sum;
-    }
-    
-    private static boolean editKeyValid(String suppliedEditKey, ObjectNode assignmentNode) {
-        String storedEditKey = assignmentNode.get("editKey").asText();
-        return suppliedEditKey.equals(storedEditKey) && !suppliedEditKey.contains("/");
-          // Otherwise it's an LTI edit key (tool consumer ID + user ID)
-    }
+    @Inject private AssignmentService assignmentService;
+    private static Logger logger = System.getLogger("com.horstmann.codecheck");
     
     /*
      * assignmentID == null: new assignment
@@ -212,7 +120,7 @@ public class Assignment extends Controller {
                 assignmentNode.remove("assignmentID");
             }
             else { // Edit existing assignment
-                if (!editKeyValid(editKey, assignmentNode)) 
+                if (!AssignmentService.editKeyValid(editKey, assignmentNode)) 
                     // In the latter case, it is an LTI toolConsumerID + userID             
                     return badRequest("editKey " + editKey + " does not match");
             }
@@ -266,7 +174,7 @@ public class Assignment extends Controller {
             assignmentNode.put("clearIDURL", "/assignment/" + assignmentID + "/" + ccid);
             workID = ccid + "/" + editKey;          
         } else { // Instructor
-            if (ccid == null && editKey != null && !editKeyValid(editKey, assignmentNode))
+            if (ccid == null && editKey != null && !AssignmentService.editKeyValid(editKey, assignmentNode))
                 throw new IllegalArgumentException("Edit key does not match");
             if (ccid != null && editKey != null) {  // Instructor viewing student submission
                 assignmentNode.put("saveCommentURL", "/saveComment"); 
@@ -429,7 +337,7 @@ public class Assignment extends Controller {
                     if (now.isAfter(deadline)) 
                         return badRequest("After deadline of " + deadline);
                 } catch (DateTimeParseException e) { // TODO: This should never happen, but it did
-                    logger.error(Util.getStackTrace(e));
+                    logger.log(Level.ERROR, Util.getStackTrace(e));
                 }
             }
             result.put("submittedAt", now.toString());      
@@ -437,7 +345,7 @@ public class Assignment extends Controller {
             assignmentConn.writeNewerJsonObjectToDB("CodeCheckWork", requestNode, "assignmentID", "submittedAt");
             return ok(result);
         } catch (Exception e) {
-            logger.error(Util.getStackTrace(e));
+            logger.log(Level.ERROR, Util.getStackTrace(e));
             return badRequest(e.getMessage());
         }           
     }
@@ -459,7 +367,7 @@ public class Assignment extends Controller {
             result.put("refreshURL", "/private/submission/" + assignmentID + "/" + workID);
             return ok(result);
         } catch (Exception e) {
-            logger.error(Util.getStackTrace(e));
+            logger.log(Level.ERROR, Util.getStackTrace(e));
             return badRequest(e.getMessage());
         }           
     } 
