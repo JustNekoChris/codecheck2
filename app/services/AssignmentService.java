@@ -1,14 +1,22 @@
 package services;
 
+import java.io.IOException;
+import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+
+import javax.inject.Inject;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.horstmann.codecheck.Util;
+
+import models.AssignmentConnector;
 
 public class AssignmentService {
+    @Inject private AssignmentConnector assignmentConn;
     
     
     public static ArrayNode parseAssignment(String assignment) {
@@ -103,5 +111,96 @@ public class AssignmentService {
         String storedEditKey = assignmentNode.get("editKey").asText();
         return suppliedEditKey.equals(storedEditKey) && !suppliedEditKey.contains("/");
           // Otherwise it's an LTI edit key (tool consumer ID + user ID)
+    }
+
+    public ArrayNode makeSubmissions(String assignmentID, String editKey) 
+            throws IOException {
+        ObjectNode assignmentNode = assignmentConn.readJsonObjectFromDB("CodeCheckAssignments", "assignmentID", assignmentID);
+        // if (assignmentNode == null) return badRequest("Assignment not found");
+        if (assignmentNode == null) return null;
+        
+        if (!editKeyValid(editKey, assignmentNode))
+            throw new IllegalArgumentException("Edit key does not match");
+
+        ArrayNode submissions = JsonNodeFactory.instance.arrayNode();
+
+        Map<String, ObjectNode> itemMap = assignmentConn.readJsonObjectsFromDB("CodeCheckWork", "assignmentID", assignmentID, "workID");
+
+        for (String submissionKey : itemMap.keySet()) {
+            String[] parts = submissionKey.split("/");
+            String ccid = parts[0];
+            String submissionEditKey = parts[1];
+            
+            ObjectNode work = itemMap.get(submissionKey);
+            ObjectNode submissionData = JsonNodeFactory.instance.objectNode();
+            submissionData.put("opaqueID", ccid);
+            submissionData.put("score", score(assignmentNode, work));
+            submissionData.set("submittedAt", work.get("submittedAt"));
+            submissionData.put("viewURL", "/private/submission/" + assignmentID + "/" + ccid + "/" + submissionEditKey); 
+            submissions.add(submissionData);            
+        }
+        return submissions;
+    }
+
+    public Map<String, Object> workInfo(ObjectNode assignmentNode, boolean isStudent, String ccid, String editKey, String assignmentID,
+    boolean editKeySaved, boolean ccidCookieExists, String ccidCookieValue, boolean editKeyCookieExists, String editKeyCookieValue, String workID) 
+            throws IOException {
+        assignmentNode.put("isStudent", isStudent);
+        if (isStudent) {
+            if (ccid == null) {         
+                if (ccidCookieExists) {
+                    ccid = ccidCookieValue;
+                    if (editKeyCookieExists) 
+                        editKey = editKeyCookieValue;
+                    else { // This shouldn't happen, but if it does, clear ID
+                        ccid = com.horstmann.codecheck.Util.createPronouncableUID();
+                        editKey = Util.createPrivateUID();
+                        editKeySaved = false;                       
+                    }
+                } else { // First time on this browser
+                    ccid = com.horstmann.codecheck.Util.createPronouncableUID();
+                    editKey = Util.createPrivateUID();
+                    editKeySaved = false;
+                }
+            } else if (editKey == null) { // Clear ID request
+                ccid = com.horstmann.codecheck.Util.createPronouncableUID();
+                editKey = Util.createPrivateUID();
+                editKeySaved = false;               
+            }
+            assignmentNode.put("clearIDURL", "/assignment/" + assignmentID + "/" + ccid);
+            workID = ccid + "/" + editKey;          
+        } else { // Instructor
+            if (ccid == null && editKey != null && !AssignmentService.editKeyValid(editKey, assignmentNode))
+                throw new IllegalArgumentException("Edit key does not match");
+            if (ccid != null && editKey != null) {  // Instructor viewing student submission
+                assignmentNode.put("saveCommentURL", "/saveComment"); 
+                workID = ccid + "/" + editKey;
+                // Only put workID into assignmentNode when viewing submission as Instructor, for security reason
+                assignmentNode.put("workID", workID);
+            }
+        }
+        assignmentNode.remove("editKey");
+        ArrayNode groups = (ArrayNode) assignmentNode.get("problems");
+        assignmentNode.set("problems", groups.get(Math.abs(workID.hashCode()) % groups.size()));
+        
+        // Start reading work and comments
+        String work = null;
+        ObjectNode commentObject = null;
+        String comment = null;
+        if (!workID.equals(""))  {
+            work = assignmentConn.readJsonStringFromDB("CodeCheckWork", "assignmentID", assignmentID, "workID", workID);
+            commentObject = assignmentConn.readJsonObjectFromDB("CodeCheckComments", "assignmentID", assignmentID, "workID", workID);
+        }
+        if (work == null) 
+            work = "{ assignmentID: \"" + assignmentID + "\", workID: \"" 
+                + workID + "\", problems: {} }";
+        if (commentObject == null)
+            comment = "";
+        else
+            comment = commentObject.get("comment").asText();
+        assignmentNode.put("comment", comment);
+
+        return Map.of("assignmentNode", assignmentNode, "work", work, "workID", workID, "editKey", editKey, 
+            "ccid", ccid, "editKeySaved", editKeySaved);
     }
 }

@@ -137,8 +137,7 @@ public class Assignment extends Controller {
      * ccid == null, editKey == null, isStudent = false: Instructor views someone else's assignment (for cloning) 
      * ccid == null, editKey != null, isStudent = false: Instructor views own assignment (for editing, viewing submissions)
      */
-    public Result work(Http.Request request, String assignmentID, String ccid, String editKey, 
-            boolean isStudent) 
+    public Result work(Http.Request request, String assignmentID, String ccid, String editKey, boolean isStudent) 
             throws IOException, GeneralSecurityException {
         String prefix = controllers.Util.prefix(request);
         String workID = "";
@@ -146,120 +145,67 @@ public class Assignment extends Controller {
 
         ObjectNode assignmentNode = assignmentConn.readJsonObjectFromDB("CodeCheckAssignments", "assignmentID", assignmentID);        
         if (assignmentNode == null) return badRequest("Assignment not found");
-        
-        assignmentNode.put("isStudent", isStudent);
-        if (isStudent) {
-            if (ccid == null) {         
-                Optional<Http.Cookie> ccidCookie = request.getCookie("ccid");
-                if (ccidCookie.isPresent()) {
-                    ccid = ccidCookie.get().value();
-                    Optional<Http.Cookie> editKeyCookie = request.getCookie("cckey");
-                    if (editKeyCookie.isPresent()) 
-                        editKey = editKeyCookie.get().value();
-                    else { // This shouldn't happen, but if it does, clear ID
-                        ccid = com.horstmann.codecheck.Util.createPronouncableUID();
-                        editKey = Util.createPrivateUID();
-                        editKeySaved = false;                       
-                    }
-                } else { // First time on this browser
-                    ccid = com.horstmann.codecheck.Util.createPronouncableUID();
-                    editKey = Util.createPrivateUID();
-                    editKeySaved = false;
-                }
-            } else if (editKey == null) { // Clear ID request
-                ccid = com.horstmann.codecheck.Util.createPronouncableUID();
-                editKey = Util.createPrivateUID();
-                editKeySaved = false;               
-            }
-            assignmentNode.put("clearIDURL", "/assignment/" + assignmentID + "/" + ccid);
-            workID = ccid + "/" + editKey;          
-        } else { // Instructor
-            if (ccid == null && editKey != null && !AssignmentService.editKeyValid(editKey, assignmentNode))
-                throw new IllegalArgumentException("Edit key does not match");
-            if (ccid != null && editKey != null) {  // Instructor viewing student submission
-                assignmentNode.put("saveCommentURL", "/saveComment"); 
-                workID = ccid + "/" + editKey;
-                // Only put workID into assignmentNode when viewing submission as Instructor, for security reason
-                assignmentNode.put("workID", workID);
-            }
-        }
-        assignmentNode.remove("editKey");
-        ArrayNode groups = (ArrayNode) assignmentNode.get("problems");
-        assignmentNode.set("problems", groups.get(Math.abs(workID.hashCode()) % groups.size()));
-        
-        // Start reading work and comments
-        String work = null;
-        ObjectNode commentObject = null;
-        String comment = null;
-        if (!workID.equals(""))  {
-            work = assignmentConn.readJsonStringFromDB("CodeCheckWork", "assignmentID", assignmentID, "workID", workID);
-            commentObject = assignmentConn.readJsonObjectFromDB("CodeCheckComments", "assignmentID", assignmentID, "workID", workID);
-        }
-        if (work == null) 
-            work = "{ assignmentID: \"" + assignmentID + "\", workID: \"" 
-                + workID + "\", problems: {} }";
-        if (commentObject == null)
-            comment = "";
-        else
-            comment = commentObject.get("comment").asText();
-        assignmentNode.put("comment", comment);
 
-        String lti = "undefined";
-        if (isStudent) {                        
-            String returnToWorkURL = prefix + "/private/resume/" + assignmentID + "/" + ccid + "/" + editKey;
-            assignmentNode.put("returnToWorkURL", returnToWorkURL); 
-            assignmentNode.put("editKeySaved", editKeySaved);
-            assignmentNode.put("sentAt", Instant.now().toString());
-            Http.Cookie newCookie1 = controllers.Util.buildCookie("ccid", ccid);
-            Http.Cookie newCookie2 = controllers.Util.buildCookie("cckey", editKey);
-            return ok(views.html.workAssignment.render(assignmentNode.toString(), work, ccid, lti))
-                    .withCookies(newCookie1, newCookie2);
-        }
-        else { // Instructor
-            if (ccid == null) {
-                if (editKey != null) { // Instructor viewing for editing/submissions                    
-                    // TODO: Check if there are any submissions?
-                    assignmentNode.put("viewSubmissionsURL", "/private/viewSubmissions/" + assignmentID + "/" + editKey);
-                    String publicURL = prefix + "/assignment/" + assignmentID;
-                    String privateURL = prefix + "/private/assignment/" + assignmentID + "/" + editKey;
-                    String editAssignmentURL = prefix + "/private/editAssignment/" + assignmentID + "/" + editKey;
-                    assignmentNode.put("editAssignmentURL", editAssignmentURL);
-                    assignmentNode.put("privateURL", privateURL);
-                    assignmentNode.put("publicURL", publicURL);                 
+        Optional<Http.Cookie> ccidCookie = request.getCookie("ccid");
+        boolean ccidCookieExists = ccidCookie.isPresent();
+        String ccidCookieValue = ccidCookieExists ? ccidCookie.get().value() : null;
+
+        Optional<Http.Cookie> editKeyCookie = request.getCookie("cckey");
+        boolean editKeyCookieExists = editKeyCookie.isPresent();
+        String editKeyCookieValue = editKeyCookieExists ? editKeyCookie.get().value() : null;
+
+        try {
+            Map<String, Object> info = assignmentService.workInfo(
+                assignmentNode, isStudent, ccid, editKey, assignmentID, editKeySaved, 
+                ccidCookieExists, ccidCookieValue, editKeyCookieExists, editKeyCookieValue, workID
+                );
+            assignmentNode = (ObjectNode) info.get("assignmentNode");
+            ccid = (String) info.get("ccid");
+            editKey = (String) info.get("editKey");
+            workID = (String) info.get("workID");
+            editKeySaved = (boolean) info.get("editKeySaved");
+            String work = (String) info.get("work");
+            
+            String lti = "undefined";
+            if (isStudent) {                        
+                String returnToWorkURL = prefix + "/private/resume/" + assignmentID + "/" + ccid + "/" + editKey;
+                assignmentNode.put("returnToWorkURL", returnToWorkURL); 
+                assignmentNode.put("editKeySaved", editKeySaved);
+                assignmentNode.put("sentAt", Instant.now().toString());
+                Http.Cookie newCookie1 = controllers.Util.buildCookie("ccid", ccid);
+                Http.Cookie newCookie2 = controllers.Util.buildCookie("cckey", editKey);
+                return ok(views.html.workAssignment.render(assignmentNode.toString(), work, ccid, lti))
+                        .withCookies(newCookie1, newCookie2);
+            }
+            else { // Instructor
+                if (ccid == null) {
+                    if (editKey != null) { // Instructor viewing for editing/submissions                    
+                        // TODO: Check if there are any submissions?
+                        assignmentNode.put("viewSubmissionsURL", "/private/viewSubmissions/" + assignmentID + "/" + editKey);
+                        String publicURL = prefix + "/assignment/" + assignmentID;
+                        String privateURL = prefix + "/private/assignment/" + assignmentID + "/" + editKey;
+                        String editAssignmentURL = prefix + "/private/editAssignment/" + assignmentID + "/" + editKey;
+                        assignmentNode.put("editAssignmentURL", editAssignmentURL);
+                        assignmentNode.put("privateURL", privateURL);
+                        assignmentNode.put("publicURL", publicURL);                 
+                    }
+                    String cloneURL = prefix + "/copyAssignment/" + assignmentID;
+                    assignmentNode.put("cloneURL", cloneURL);
                 }
-                String cloneURL = prefix + "/copyAssignment/" + assignmentID;
-                assignmentNode.put("cloneURL", cloneURL);
+                
+                return ok(views.html.workAssignment.render(assignmentNode.toString(), work, ccid, lti));
             }
             
-            return ok(views.html.workAssignment.render(assignmentNode.toString(), work, ccid, lti));
+        } catch (Exception e) {
+            badRequest(e.getMessage());
         }
+
     }
     
     public Result viewSubmissions(Http.Request request, String assignmentID, String editKey)
         throws IOException {
-        ObjectNode assignmentNode = assignmentConn.readJsonObjectFromDB("CodeCheckAssignments", "assignmentID", assignmentID);
-        if (assignmentNode == null) return badRequest("Assignment not found");
-        
-        if (!editKeyValid(editKey, assignmentNode))
-            throw new IllegalArgumentException("Edit key does not match");
-
-        ArrayNode submissions = JsonNodeFactory.instance.arrayNode();
-
-        Map<String, ObjectNode> itemMap = assignmentConn.readJsonObjectsFromDB("CodeCheckWork", "assignmentID", assignmentID, "workID");
-
-        for (String submissionKey : itemMap.keySet()) {
-            String[] parts = submissionKey.split("/");
-            String ccid = parts[0];
-            String submissionEditKey = parts[1];
-            
-            ObjectNode work = itemMap.get(submissionKey);
-            ObjectNode submissionData = JsonNodeFactory.instance.objectNode();
-            submissionData.put("opaqueID", ccid);
-            submissionData.put("score", Assignment.score(assignmentNode, work));
-            submissionData.set("submittedAt", work.get("submittedAt"));
-            submissionData.put("viewURL", "/private/submission/" + assignmentID + "/" + ccid + "/" + submissionEditKey); 
-            submissions.add(submissionData);            
-        }
+        ArrayNode submissions = assignmentService.makeSubmissions(assignmentID, editKey);
+        if (submissions == null) return badRequest("Assignment not found");
         String allSubmissionsURL = "/lti/allSubmissions?resourceID=" + URLEncoder.encode(assignmentID, "UTF-8");
         return ok(views.html.viewSubmissions.render(allSubmissionsURL, submissions.toString()));    
     }
@@ -272,7 +218,7 @@ public class Assignment extends Controller {
         ObjectNode params = (ObjectNode) request.body().asJson();
 
         try {
-            params.set("problems", parseAssignment(params.get("problems").asText()));
+            params.set("problems", AssignmentService.parseAssignment(params.get("problems").asText()));
         } catch (IllegalArgumentException e) {
             return badRequest(e.getMessage());
         }
@@ -286,7 +232,7 @@ public class Assignment extends Controller {
             
             if (!params.has("editKey")) return badRequest("Missing edit key");
             editKey = params.get("editKey").asText();
-            if (!editKeyValid(editKey, assignmentNode)) 
+            if (!AssignmentService.editKeyValid(editKey, assignmentNode)) 
                 return badRequest("Edit key does not match");
         }
         else { // New assignment or clone 

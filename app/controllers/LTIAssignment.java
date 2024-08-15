@@ -30,6 +30,7 @@ import play.mvc.Controller;
 import play.mvc.Http;
 import play.mvc.Result;
 import play.mvc.Security;
+import services.AssignmentService;
 
    
 /*
@@ -111,7 +112,7 @@ public class LTIAssignment extends Controller {
         String assignmentID = assignmentIDifAssignmentURL(problemText);
         if (assignmentID == null) {             
             try {
-                params.set("problems", Assignment.parseAssignment(problemText));
+                params.set("problems", AssignmentService.parseAssignment(problemText));
             } catch (IllegalArgumentException e) {
                 return badRequest(e.getMessage());
             }
@@ -149,7 +150,7 @@ public class LTIAssignment extends Controller {
             ObjectNode work = itemMap.get(workID);
             ObjectNode submissionData = JsonNodeFactory.instance.objectNode();
             submissionData.put("opaqueID", workID);
-            submissionData.put("score", Assignment.score(assignmentNode, work));
+            submissionData.put("score", AssignmentService.score(assignmentNode, work));
             submissionData.set("submittedAt", work.get("submittedAt"));
             submissionData.put("viewURL", "/lti/viewSubmission?resourceID=" 
                     + URLEncoder.encode(resourceID, "UTF-8") 
@@ -405,7 +406,7 @@ public class LTIAssignment extends Controller {
         String assignmentID = assignmentOfResource(resourceID); 
         
         ObjectNode assignmentNode = getAssignmentNode(assignmentID);
-        double score = Assignment.score(assignmentNode, work);
+        double score = AssignmentService.score(assignmentNode, work);
         result.put("score", score);     
         
         String outcome = lti.passbackGradeToLMS(outcomeServiceUrl, sourcedID, score, oauthConsumerKey); 
